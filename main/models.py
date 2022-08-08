@@ -1,7 +1,9 @@
+import time
+
 from django.db import models
 
 from django.dispatch import receiver
-from django.db.models.signals import post_save, post_delete, pre_delete, pre_save
+from django.db.models.signals import post_save, post_delete, pre_delete, pre_save, m2m_changed
 
 
 class Printer(models.Model):
@@ -12,11 +14,22 @@ class Printer(models.Model):
         return f'{self.manufacture} - {self.name}'
 
 
-class Cartridge(models.Model):
+class TypeCartridge(models.Model):
     name = models.CharField(max_length=100)
     manufacture = models.CharField(max_length=100, choices=(('Kyocera', 'Kyocera'), ('HP', 'HP')))
     printer = models.ForeignKey(Printer, related_name='cartridges', on_delete=models.SET_NULL, blank=True, null=True)
-    count = models.PositiveIntegerField(default=0)
+
+    @property
+    def all_count(self):
+        return len(self.cartridges.all())
+
+    @property
+    def empty_count(self):
+        return len(self.cartridges.filter(is_empty=True))
+
+    @property
+    def broken_count(self):
+        return len(self.cartridges.filter(is_broken=True))
 
     def __str__(self):
         return f'{self.manufacture} - {self.name}'
@@ -25,65 +38,54 @@ class Cartridge(models.Model):
 class Structure(models.Model):
     name = models.CharField(max_length=100)
     printers = models.ManyToManyField(Printer, related_name='structures', blank=True, null=True)
+    is_store = models.BooleanField(default=False)
+    is_refueling = models.BooleanField(default=False)
+
+    @property
+    def all_count(self):
+        return len(self.cartridges.all())
+
+    @property
+    def empty_count(self):
+        return len(self.cartridges.filter(is_empty=True))
+
+    @property
+    def broken_count(self):
+        return len(self.cartridges.filter(is_broken=True))
 
     def __str__(self):
         return f'{self.name}'
 
 
-# # Structure receivers
-# @receiver(post_save, sender=Structure)
-# def create_cartridges(sender, instance, **kwargs):
-#     for printer in instance.printers.all():
-#         for cartridge in printer.cartridges.all():
-
-
-class CartridgeStructure(models.Model):
-    cartridge = models.ForeignKey(Cartridge, related_name='cartridges', on_delete=models.CASCADE)
-    structure = models.ForeignKey(Structure, related_name='cartridges', on_delete=models.CASCADE)
-    count = models.IntegerField(default=1)
-    date_create = models.DateTimeField(auto_now_add=True)
+class Cartridge(models.Model):
+    id = models.AutoField(max_length=6, primary_key=True, unique=True, default=100000)
+    type = models.ForeignKey(TypeCartridge, related_name='cartridges', on_delete=models.CASCADE)
+    is_empty = models.BooleanField(default=False)
+    is_broken = models.BooleanField(default=False)
+    structure = models.ForeignKey(Structure, related_name='cartridges', on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
-        return f'{self.structure.name} {self.cartridge.name} {self.count}'
+        return f'{self.id} {self.type.name}'
 
 
 class CartridgeMovement(models.Model):
-    count = models.PositiveIntegerField(default=1)
     cartridge = models.ForeignKey(Cartridge, related_name='movements', on_delete=models.CASCADE)
     from_structure = models.ForeignKey(Structure, related_name='from_movements', on_delete=models.CASCADE, blank=True,
                                        null=True)
     to_structure = models.ForeignKey(Structure, related_name='to_movements', on_delete=models.CASCADE)
     date_create = models.DateTimeField(auto_now_add=True)
-
-    def change_count_on_structures(self):
-        if self.from_structure:
-            for cs in self.from_structure.cartridges.all():
-                if cs.cartridge == self.cartridge:
-                    cs.count -= self.count
-                    if cs.count < 0:
-                        return True, f'{self.from_structure.name} нет картриджей на остатке'
-                    cs.save()
-        for cs in self.to_structure.cartridges.all():
-            if cs.cartridge == self.cartridge:
-                cs.count += self.count
-                cs.save()
-        return False, ''
-
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
-        is_error, text_error = self.change_count_on_structures()
-        if not is_error:
-            super().save(force_insert, force_update, using, update_fields)
-        else:
-            print(text_error)
+    user_fulfilled = models.CharField(max_length=100, blank=True, null=True)
+    date_confirmed = models.DateTimeField(blank=True, null=True)
+    user_confirmed = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
-        return f'{self.cartridge.name}'
+        return f'{self.cartridge.type.name}'
 
 
-@receiver(pre_delete, sender=CartridgeMovement)
+@receiver(post_save, sender=CartridgeMovement)
 def create_cartridges(sender, instance, **kwargs):
-    instance.from_structure, instance.to_structure = instance.to_structure, instance.from_structure
-    instance.change_count_on_structures()
+    instance.cartridge.structure = instance.to_structure
+    instance.cartridge.save()
 
 
 class CartridgeOrder(models.Model):
@@ -98,4 +100,4 @@ class CartridgeOrder(models.Model):
     comment = models.TextField(blank=True, null=True)
 
     def __str__(self):
-        return f'{self.cartridge.name} -> {self.structure.name}'
+        return f'{self.cartridge} -> {self.structure.name}'
