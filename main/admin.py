@@ -61,4 +61,5 @@ class PrinterAdmin(admin.ModelAdmin):
 
 @admin.register(CartridgeOrder)
 class CartridgeOrderAdmin(admin.ModelAdmin):
-    list_display = ('structure', 'cartridge')
+    list_display = ('structure', 'type_cartridge')
+    readonly_fields = ('date_create',)

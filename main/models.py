@@ -60,10 +60,25 @@ class Cartridge(models.Model):
     type = models.ForeignKey(TypeCartridge, related_name='cartridges', on_delete=models.CASCADE)
     is_empty = models.BooleanField(default=False)
     is_broken = models.BooleanField(default=False)
-    structure = models.ForeignKey(Structure, related_name='cartridges', on_delete=models.SET_NULL, null=True, blank=True)
+    structure = models.ForeignKey(Structure, related_name='cartridges', on_delete=models.SET_NULL, null=True,
+                                  blank=True)
 
     def __str__(self):
         return f'{self.id} {self.type.name}'
+
+
+class CartridgeOrder(models.Model):
+    structure = models.ForeignKey(Structure, related_name='orders', on_delete=models.CASCADE)
+    type_cartridge = models.ForeignKey(TypeCartridge, related_name='orders', on_delete=models.CASCADE)
+    date_create = models.DateTimeField(auto_now_add=True)
+    date_complete = models.DateTimeField(blank=True, null=True)
+    user_create = models.CharField(max_length=100, blank=True, null=True)
+    user_complete = models.CharField(max_length=100, blank=True, null=True)
+    deleted = models.BooleanField(default=False)
+    comment = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f'{self.type_cartridge} -> {self.structure.name}'
 
 
 class CartridgeMovement(models.Model):
@@ -75,6 +90,8 @@ class CartridgeMovement(models.Model):
     user_fulfilled = models.CharField(max_length=100, blank=True, null=True)
     date_confirmed = models.DateTimeField(blank=True, null=True)
     user_confirmed = models.CharField(max_length=100, blank=True, null=True)
+    order = models.ForeignKey(CartridgeOrder, related_name='movements', on_delete=models.SET_NULL, blank=True,
+                              null=True)
 
     def __str__(self):
         return f'{self.pk}'
@@ -84,17 +101,3 @@ class CartridgeMovement(models.Model):
 def create_cartridges(sender, instance, **kwargs):
     instance.cartridge.structure = instance.to_structure
     instance.cartridge.save()
-
-
-class CartridgeOrder(models.Model):
-    structure = models.ForeignKey(Structure, related_name='orders', on_delete=models.CASCADE)
-    cartridge = models.ForeignKey(Cartridge, related_name='orders', on_delete=models.CASCADE)
-    date_create = models.DateTimeField(auto_now_add=True)
-    date_complete = models.DateTimeField(blank=True, null=True)
-    user_create = models.CharField(max_length=100, blank=True, null=True)
-    user_complete = models.CharField(max_length=100, blank=True, null=True)
-    deleted = models.BooleanField(default=False)
-    comment = models.TextField(blank=True, null=True)
-
-    def __str__(self):
-        return f'{self.cartridge} -> {self.structure.name}'
