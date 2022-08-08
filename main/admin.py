@@ -40,10 +40,18 @@ class StructureAdmin(admin.ModelAdmin):
     list_display = ('__str__', 'all_count', 'empty_count', 'broken_count')
 
 
+@admin.action(description='Поставить/снять пометку пустые')
+def make_empty(modeladmin, request, queryset):
+    for cartridge in queryset:
+        cartridge.is_empty = not cartridge.is_empty
+        cartridge.save()
+
+
 @admin.register(Cartridge)
 class CartridgeAdmin(admin.ModelAdmin):
     inlines = (CartridgeMovementInline,)
     list_display = ('__str__', 'is_empty', 'is_broken', 'structure')
+    actions = (make_empty, )
 
 
 @admin.register(Printer)
@@ -53,4 +61,4 @@ class PrinterAdmin(admin.ModelAdmin):
 
 @admin.register(CartridgeOrder)
 class CartridgeOrderAdmin(admin.ModelAdmin):
-    list_display = ('structure', 'cartridge', 'count')
+    list_display = ('structure', 'cartridge')

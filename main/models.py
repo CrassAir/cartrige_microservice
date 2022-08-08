@@ -1,5 +1,3 @@
-import time
-
 from django.db import models
 
 from django.dispatch import receiver
@@ -58,7 +56,7 @@ class Structure(models.Model):
 
 
 class Cartridge(models.Model):
-    id = models.AutoField(max_length=6, primary_key=True, unique=True, default=100000)
+    id = models.AutoField(primary_key=True, unique=True, default=100000)
     type = models.ForeignKey(TypeCartridge, related_name='cartridges', on_delete=models.CASCADE)
     is_empty = models.BooleanField(default=False)
     is_broken = models.BooleanField(default=False)
@@ -79,7 +77,7 @@ class CartridgeMovement(models.Model):
     user_confirmed = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
-        return f'{self.cartridge.type.name}'
+        return f'{self.pk}'
 
 
 @receiver(post_save, sender=CartridgeMovement)
@@ -91,9 +89,8 @@ def create_cartridges(sender, instance, **kwargs):
 class CartridgeOrder(models.Model):
     structure = models.ForeignKey(Structure, related_name='orders', on_delete=models.CASCADE)
     cartridge = models.ForeignKey(Cartridge, related_name='orders', on_delete=models.CASCADE)
-    count = models.PositiveIntegerField(default=1)
     date_create = models.DateTimeField(auto_now_add=True)
-    date_complete = models.DateTimeField()
+    date_complete = models.DateTimeField(blank=True, null=True)
     user_create = models.CharField(max_length=100, blank=True, null=True)
     user_complete = models.CharField(max_length=100, blank=True, null=True)
     deleted = models.BooleanField(default=False)
