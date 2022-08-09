@@ -101,3 +101,9 @@ class CartridgeMovement(models.Model):
 def create_cartridges(sender, instance, **kwargs):
     instance.cartridge.structure = instance.to_structure
     instance.cartridge.save()
+
+
+@receiver(pre_delete, sender=CartridgeMovement)
+def delete_cartridges(sender, instance, **kwargs):
+    instance.cartridge.structure = instance.from_structure
+    instance.cartridge.save()
